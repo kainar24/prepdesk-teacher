@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PrepDesk Teacher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--brand:#2f3a8f;--blue:#324dc7;--ink:#1e1e1e;--muted:#5f6368;--line:#e3e6ef;--bg:#f4f6fb;--card:#fff;--red:#c8102e;--green:#2e8b57;--amber:#b7791f}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--ink:#e8e9ee;--muted:#a3a8b8;--line:#2e3243;--bg:#14161f;--card:#1d2030}}
+:root[data-theme=dark]{--ink:#e8e9ee;--muted:#a3a8b8;--line:#2e3243;--bg:#14161f;--card:#1d2030}
+*{box-sizing:border-box}
+body{margin:0;font-family:Roboto,-apple-system,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+button{font:inherit;cursor:pointer}
+.top{background:var(--brand);color:#fff;padding:16px 24px;display:flex;align-items:center;gap:12px}
+.top .sp{flex:1}
+.top b{font-size:20px}
+.top button{background:none;border:0;color:#fff;text-decoration:underline}
+.wrap{max-width:1100px;margin:22px auto;padding:0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin-bottom:18px}
+h2{font-size:19px;margin:0 0 14px}
+label{display:block;font-size:14px;font-weight:500;margin-bottom:12px}
+input{display:block;width:100%;max-width:420px;height:40px;margin-top:5px;padding:0 10px;border:1.5px solid #999;border-radius:7px;font:15px Roboto,Arial,sans-serif;background:var(--card);color:var(--ink)}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:999px;padding:9px 20px;font-weight:700}
+.btn.ghost{background:transparent;color:var(--blue);border:1.5px solid var(--blue)}
+.btn.danger{background:transparent;color:var(--red);border:1.5px solid var(--red)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.err{color:var(--red);font-size:14px;margin-top:8px;min-height:18px}
+.ok{color:var(--green)}
+.muted{color:var(--muted);font-size:13.5px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12.5px;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+tr.click{cursor:pointer}tr.click:hover{background:rgba(50,77,199,.07)}
+.code{font-family:ui-monospace,Menlo,monospace;font-weight:700;letter-spacing:1.5px;background:rgba(50,77,199,.1);padding:3px 8px;border-radius:6px}
+.badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+.b-red{background:rgba(200,16,46,.13);color:var(--red)}.b-amb{background:rgba(183,121,31,.15);color:var(--amber)}.b-grn{background:rgba(46,139,87,.14);color:var(--green)}
+.score{font-size:22px;font-weight:700}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.tile b{display:block;font-size:28px}
+.feed{max-height:340px;overflow:auto}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:p 1.6s infinite}
+@keyframes p{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+.hide{display:none}
+@media (max-width:640px){.hide-sm{display:none}}
+</style>
+</head>
+<body>
+<div class="top"><b>PrepDesk</b><span>· кабинет преподавателя</span><span class="sp"></span><button id="out" class="hide">Выйти</button></div>
+<div class="wrap" id="view"></div>
+<script>
+/* Built-in connection; same publishable values as web/js/config.js. */
+window.PREPDESK_BACKEND = { url: 'https://aagutqhdlfavfkhqqauq.supabase.co', anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFhZ3V0cWhkbGZhdmZraHFxYXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5ODcxNDgsImV4cCI6MjEwOTU2MzE0OH0.nay8axudDthva4t2s0UczhuwTAZRZagz3zTDY0se4Xw' };
+</script>
+<script>
+'use strict';
+const V = document.getElementById('view');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = d => d ? new Date(d).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+const KIND = { signin: ['Вошёл по коду', ''], start: ['Начал тест', ''], module: ['Начал модуль', ''], moduleEnd: ['Закончил модуль', ''], break: ['Перерыв', ''],
+  focusLost: ['Окно теряло фокус', 'b-red'], lockReleased: ['Блокировка снята клавишами', 'b-red'], unscheduledBreak: ['Внеплановый перерыв', 'b-amb'],
+  pause: ['Пауза', 'b-amb'], sleep: ['Компьютер уходил в сон', 'b-amb'], resume: ['Приложение открыто заново', 'b-amb'], relock: ['Снова заблокирован', ''],
+  proctorExit: ['Вышел с сохранением', 'b-amb'], proctorEnd: ['Завершил досрочно', 'b-amb'] };
+const BAD = ['focusLost', 'lockReleased'];
+let sb = null, poll = null;
+
+function cfg() {
+  try { const c = JSON.parse(localStorage.getItem('pd.cfg') || 'null'); if (c) return c; } catch (e) { /* storage blocked */ }
+  const b = window.PREPDESK_BACKEND;
+  return b ? { url: b.url, key: b.anonKey } : null;
+}
+
+function setup(msg) {
+  const c = cfg() || {};
+  V.innerHTML = `<div class="card"><h2>Подключение к базе</h2>
+    <p class="muted">Те же два значения, что вставлены в приложение: Supabase → Project Settings → API.</p>
+    <label>Project URL<input id="u" value="${esc(c.url || '')}" placeholder="https://xxxx.supabase.co"></label>
+    <label>Anon public key<input id="k" value="${esc(c.key || '')}"></label>
+    <div class="row"><button class="btn" id="save">Сохранить</button></div><div class="err">${esc(msg || '')}</div></div>`;
+  document.getElementById('save').onclick = () => {
+    const url = document.getElementById('u').value.trim().replace(/\/$/, ''), key = document.getElementById('k').value.trim();
+    if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(url) || key.length < 20) return setup('Проверь адрес и ключ.');
+    localStorage.setItem('pd.cfg', JSON.stringify({ url, key }));
+    boot();
+  };
+}
+
+function login(msg, isNew) {
+  V.innerHTML = `<div class="card" style="max-width:460px;margin:40px auto"><h2>${isNew ? 'Регистрация преподавателя' : 'Вход для преподавателя'}</h2>
+    <label>Email<input id="e" type="email" autocomplete="username"></label>
+    <label>Пароль<input id="p" type="password" autocomplete="${isNew ? 'new-password' : 'current-password'}"></label>
+    <div class="row"><button class="btn" id="go">${isNew ? 'Создать аккаунт' : 'Войти'}</button>
+    <button class="btn ghost" id="sw">${isNew ? 'У меня есть аккаунт' : 'Создать аккаунт'}</button></div>
+    <div class="err" id="m">${esc(msg || '')}</div>
+    <p class="muted" style="margin-top:14px"><a href="#" id="cfg">Изменить подключение к базе</a></p></div>`;
+  document.getElementById('sw').onclick = () => login('', !isNew);
+  document.getElementById('cfg').onclick = e => { e.preventDefault(); setup(); };
+  document.getElementById('go').onclick = async () => {
+    const email = document.getElementById('e').value.trim(), password = document.getElementById('p').value;
+    if (!email || password.length < 6) return login('Email и пароль от 6 символов.', isNew);
+    const r = isNew ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+    if (r.error) return login(r.error.message, isNew);
+    if (isNew && !r.data.session) return login('Аккаунт создан. Подтверди email по ссылке из письма и войди.', false);
+    dash();
+  };
+}
+
+/* Codes avoid look-alike characters so they are easy to read aloud. */
+function newCode() {
+  const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789', b = new Uint32Array(8);
+  crypto.getRandomValues(b);
+  return Array.from(b, x => A[x % A.length]).join('');
+}
+
+async function dash() {
+  document.getElementById('out').classList.remove('hide');
+  const [st, rs, ev] = await Promise.all([
+    sb.from('students').select('*').order('created_at', { ascending: false }),
+    sb.from('results').select('code,student,total,rw,math,finished_at,integrity').order('finished_at', { ascending: false }).limit(500),
+    sb.from('events').select('code,student,kind,detail,module,at').order('at', { ascending: false }).limit(60),
+  ]);
+  const err = st.error || rs.error || ev.error;
+  if (err) { V.innerHTML = `<div class="card"><h2>Ошибка</h2><p class="err">${esc(err.message)}</p><p class="muted">Проверь, что SQL из supabase/schema.sql выполнен.</p></div>`; return; }
+  const students = st.data, results = rs.data, events = ev.data;
+  const byCode = c => results.filter(r => r.code === c);
+  const flags = c => events.filter(e => e.code === c && BAD.includes(e.kind)).length;
+  const live = events.filter(e => Date.now() - new Date(e.at) < 15 * 60000);
+  V.innerHTML = `
+    <div class="grid3">
+      <div class="tile"><span class="muted">Студентов</span><b>${students.length}</b></div>
+      <div class="tile"><span class="muted">Пройдено тестов</span><b>${results.length}</b></div>
+      <div class="tile"><span class="muted">Активны сейчас</span><b>${new Set(live.map(e => e.code)).size}</b></div>
+    </div>
+    <div class="card"><h2>Добавить студента</h2>
+      <div class="row"><input id="nn" placeholder="Имя студента" style="max-width:300px;margin:0"><button class="btn" id="add">Создать код</button></div>
+      <div class="err" id="am"></div></div>
+    <div class="card"><h2>Студенты</h2>${students.length ? `<table><tr><th>Имя</th><th>Код</th><th>Последний балл</th><th class="hide-sm">Тестов</th><th>Нарушения</th><th></th></tr>
+      ${students.map(s => { const r = byCode(s.code), f = flags(s.code); return `<tr class="click" data-open="${esc(s.code)}">
+        <td><b>${esc(s.name)}</b></td><td><span class="code">${esc(s.code)}</span></td>
+        <td>${r[0] ? `<span class="score">${r[0].total}</span> <span class="muted">${fmt(r[0].finished_at)}</span>` : '<span class="muted">нет</span>'}</td>
+        <td class="hide-sm">${r.length}</td><td>${f ? `<span class="badge b-red">${f}</span>` : '<span class="badge b-grn">0</span>'}</td>
+        <td><button class="btn danger" data-del="${esc(s.code)}" style="padding:5px 12px">Удалить</button></td></tr>`; }).join('')}</table>`
+      : '<p class="muted">Пока никого. Добавь студента и передай ему код.</p>'}</div>
+    <div class="card"><h2><span class="dot"></span>Лента событий</h2><div class="feed">${feed(events, students)}</div></div>`;
+  document.getElementById('add').onclick = async () => {
+    const name = document.getElementById('nn').value.trim();
+    if (!name) { document.getElementById('am').textContent = 'Введи имя.'; return; }
+    const code = newCode(), r = await sb.from('students').insert({ code, name });
+    if (r.error) { document.getElementById('am').textContent = r.error.message; return; }
+    dash();
+  };
+  V.querySelectorAll('[data-del]').forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    if (!confirm('Удалить студента? Его результаты перестанут быть видны.')) return;
+    await sb.from('students').delete().eq('code', b.dataset.del); dash();
+  });
+  V.querySelectorAll('[data-open]').forEach(r => r.onclick = () => student(r.dataset.open));
+  clearInterval(poll); poll = setInterval(() => { if (!document.hidden && document.querySelector('.feed')) dash(); }, 15000);
+}
+
+function feed(events, students) {
+  const name = c => (students.find(s => s.code === c) || {}).name;
+  if (!events.length) return '<p class="muted">Событий пока нет.</p>';
+  return `<table>${events.map(e => { const k = KIND[e.kind] || [e.kind, '']; return `<tr><td class="muted" style="white-space:nowrap">${fmt(e.at)}</td>
+    <td><b>${esc(name(e.code) || e.student || e.code)}</b></td><td>${k[1] ? `<span class="badge ${k[1]}">${esc(k[0])}</span>` : esc(k[0])}</td>
+    <td class="muted hide-sm">${e.module >= 0 ? 'модуль ' + (e.module + 1) : ''}</td></tr>`; }).join('')}</table>`;
+}
+
+async function student(code) {
+  clearInterval(poll);
+  const [st, rs, ev] = await Promise.all([
+    sb.from('students').select('*').eq('code', code).single(),
+    sb.from('results').select('*').eq('code', code).order('finished_at', { ascending: false }),
+    sb.from('events').select('*').eq('code', code).order('at', { ascending: false }).limit(200),
+  ]);
+  const s = st.data || { name: code, code }, R = rs.data || [], E = ev.data || [];
+  const best = R.length ? Math.max(...R.map(r => r.total)) : null;
+  V.innerHTML = `<p><a href="#" id="bk">← Все студенты</a></p>
+    <div class="card"><h2>${esc(s.name)} <span class="code">${esc(s.code)}</span></h2>
+      <div class="grid3"><div class="tile"><span class="muted">Тестов</span><b>${R.length}</b></div>
+      <div class="tile"><span class="muted">Лучший балл</span><b>${best ?? '—'}</b></div>
+      <div class="tile"><span class="muted">Нарушений</span><b>${E.filter(e => BAD.includes(e.kind)).length}</b></div></div></div>
+    <div class="card"><h2>Результаты</h2>${R.length ? `<table><tr><th>Дата</th><th>Итог</th><th>RW</th><th>Math</th><th class="hide-sm">Модули 2</th><th>Нарушения</th></tr>
+      ${R.map(r => { const n = (r.integrity || []).filter(l => BAD.includes(l.type)).length; return `<tr><td>${fmt(r.finished_at)}</td><td class="score">${r.total}</td>
+      <td>${r.rw} <span class="muted">(${r.rw_correct}/50)</span></td><td>${r.math} <span class="muted">(${r.math_correct}/40)</span></td>
+      <td class="hide-sm muted">RW ${r.rw_route === 'hard' ? 'сложный' : 'лёгкий'}, Math ${r.math_route === 'hard' ? 'сложный' : 'лёгкий'}</td>
+      <td>${n ? `<span class="badge b-red">${n}</span>` : '<span class="badge b-grn">0</span>'}</td></tr>`; }).join('')}</table>` : '<p class="muted">Тестов пока нет.</p>'}</div>
+    <div class="card"><h2>События</h2><div class="feed">${feed(E, [s])}</div></div>`;
+  document.getElementById('bk').onclick = e => { e.preventDefault(); dash(); };
+  poll = setInterval(() => { if (!document.hidden) student(code); }, 15000);
+}
+
+async function boot() {
+  const c = cfg();
+  if (!c) return setup();
+  if (!window.supabase) { V.innerHTML = '<div class="card"><p class="err">Не загрузилась библиотека Supabase. Проверь интернет.</p></div>'; return; }
+  sb = window.supabase.createClient(c.url, c.key);
+  const { data } = await sb.auth.getSession();
+  data.session ? dash() : login();
+}
+document.getElementById('out').onclick = async () => { await sb.auth.signOut(); clearInterval(poll); document.getElementById('out').classList.add('hide'); login(); };
+boot();
+</script>
+</body>
+</html>
